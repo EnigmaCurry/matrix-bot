@@ -123,15 +123,17 @@ class Command(object):
             logger.debug("Start time: %s", time_str)
 
         # Convert start time string to a datetime object
-        time = self._parse_str_to_time(time_str)
+        time = self._parse_str_to_time(time_str, tz_aware=False)
 
         return time, reminder_text, recurse_timedelta
 
-    def _parse_str_to_time(self, time_str: str) -> datetime:
+    def _parse_str_to_time(self, time_str: str, tz_aware: bool = True) -> datetime:
         """Converts a human-readable, future time string to a datetime object
 
         Args:
             time_str: The time to convert
+            tz_aware: Whether the returned datetime should have associated timezone
+                information
 
         Returns:
             datetime: A datetime if conversion was successful
@@ -144,7 +146,7 @@ class Command(object):
             settings={
                 "PREFER_DATES_FROM": "future",
                 "TIMEZONE": CONFIG.timezone,
-                "RETURN_AS_TIMEZONE_AWARE": True,
+                "RETURN_AS_TIMEZONE_AWARE": tz_aware,
             },
         )
         if not time:
