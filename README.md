@@ -9,8 +9,8 @@ Currently it is a Magic: The Gathering card image bot.
 !mtg card Scute Mob
 ```
 
-Uploads the picture of the card named `Scute Mob`. Card images are cached in the
-`/data` volume of the container.
+Uploads the picture of the card named `Scute Mob` and posted to a matrix
+channel. Card images are cached in the `/data` volume of the container.
 
 ## Setup
 
