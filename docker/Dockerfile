@@ -39,10 +39,17 @@ RUN apk add --no-cache \
     git \
     libffi-dev \
     yaml-dev \
-    python3-dev
+    python3-dev \
+    # Pillow depenencies
+    jpeg-dev \
+    zlib-dev \
+    freetype-dev \
+    lcms2-dev \
+    openjpeg-dev \
+    tiff-dev \
+    tk-dev \
+    tcl-dev
 
-# Build libolm
-#
 # Also build the libolm python bindings and place them at /python-libs
 # We will later copy contents from both of these folders to the runtime
 # container
@@ -91,7 +98,16 @@ COPY --from=builder /usr/local/lib/libolm* /usr/local/lib/
 RUN apk add --no-cache \
     libstdc++ \
     libpq \
-    postgresql-dev
+    postgresql-dev \
+    libmagic \
+    zlib \
+    jpeg \
+    freetype \
+    lcms2 \
+    openjpeg \
+    tiff \
+    tk \
+    tcl 
 
 # Specify a volume that holds the config file, SQLite3 database,
 # and the matrix-nio store

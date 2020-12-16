@@ -17,6 +17,8 @@ from matrix_reminder_bot.storage import Storage
 
 logger = logging.getLogger(__name__)
 
+import time
+TIME_STARTUP = time.time() * 1000
 
 class Callbacks(object):
     """Callback methods that fire on certain matrix events
@@ -39,6 +41,10 @@ class Callbacks(object):
 
         # Ignore messages from ourselves
         if event.sender == self.client.user:
+            return
+
+        ## Ignore messages from the past before the bot started
+        if event.server_timestamp < TIME_STARTUP:
             return
 
         # Check whether this is a command
@@ -103,21 +109,16 @@ class Callbacks(object):
 
     async def decryption_failure(self, room: MatrixRoom, event: MegolmEvent):
         """Callback for when an event fails to decrypt. Inform the user"""
-        logger.error(
-            f"Failed to decrypt event '{event.event_id}' in room '{room.room_id}'!"
-            f"\n\n"
-            f"Tip: try using a different device ID in your config file and restart."
-            f"\n\n"
-            f"If all else fails, delete your store directory and let the bot recreate "
-            f"it (your reminders will NOT be deleted, but the bot may respond to existing "
-            f"commands a second time)."
-        )
+        ## Don't care about historical messages:
+        if event.server_timestamp > TIME_STARTUP:
+            logger.error(
+                f"Failed to decrypt event '{event.event_id}' in room '{room.room_id}'!"
+            )
 
-        user_msg = (
-            "Unable to decrypt this message. "
-            "Check whether you've chosen to only encrypt to trusted devices."
-        )
-
-        await send_text_to_room(
-            self.client, room.room_id, user_msg, reply_to_event_id=event.event_id,
-        )
+            user_msg = (
+                "Unable to decrypt this message. "
+                "Check whether you've chosen to only encrypt to trusted devices."
+            )
+            await send_text_to_room(
+                self.client, room.room_id, user_msg, reply_to_event_id=event.event_id,
+            )

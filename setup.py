@@ -38,6 +38,10 @@ setup(
         "readabledelta>=0.0.2",
         "apscheduler>=3.6.3",
         "pytz>=2020.1",
+        "mtgsdk>=1.3.1",
+        "python-magic>=0.4.18",
+        "aiohttp>=3.7.3",
+        "Pillow>=8.0.1"
     ],
     extras_require={
         "postgres": ["psycopg2>=2.8.5"],
