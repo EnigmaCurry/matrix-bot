@@ -7,15 +7,40 @@ import aiofiles
 import aiofiles.os
 import hashlib
 import os.path
+import mimetypes
 from nio import AsyncClient, SendRetryError, LoginResponse, UploadResponse
 
 from matrix_reminder_bot.config import CONFIG
 from matrix_reminder_bot.errors import CommandSyntaxError
 import magic as file_type_finder
 from PIL import Image
+from mtgsdk import Card
 
 logger = logging.getLogger(__name__)
 URL_CACHE_DIR="/data/url_cache"
+MTG_CACHE_DIR="/data/mtg_cache"
+
+# async def mtg_card_cache(name: str):
+#     directory = os.path.join(MTG_CACHE_DIR, 'cards')
+#     path = os.path.join(directory, f'{name}.json')
+#     if os.path.exists(path):
+#         return path
+#     os.makedirs(directory, exist_ok=True)
+
+#     cards = Card.where(name=name).all()
+#     if not len(cards):
+#         text = f"Sorry, I couldn't find a card called {name}"
+#         await send_text_to_room(self.client, self.room.room_id, text)
+#     else:
+#         for c in cards:
+#             if c.image_url:
+#                 card = c
+#                 img_path = await cache_http_download(card.image_url)
+#                 await send_image_to_room(self.client, self.room.room_id, img_path)
+#                 break
+#         else:
+#             text = f"Huh, I couldn't find an image for {name}"
+#             await send_text_to_room(self.client, self.room.room_id, text)
 
 
 async def http_download(url: str, path: str):
@@ -76,6 +101,7 @@ async def send_image_to_room(
     if not mime_type.startswith("image/"):
         print("Drop message because file does not have an image mime type.")
         return
+    file_extension = mimetypes.guess_extension(mime_type) or ''
 
     im = Image.open(image)
     (width, height) = im.size  # im.size returns (width,height) tuple
@@ -86,7 +112,7 @@ async def send_image_to_room(
         resp, maybe_keys = await client.upload(
             f,
             content_type=mime_type,  # image/jpeg
-            filename=os.path.basename(image),
+            filename=f"{os.path.basename(image)}{file_extension}",
             filesize=file_stat.st_size)
     if (isinstance(resp, UploadResponse)):
         print("Image was uploaded successfully to server. ")
