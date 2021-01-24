@@ -15,8 +15,12 @@ from matrix_reminder_bot.errors import CommandSyntaxError
 import magic as file_type_finder
 from PIL import Image
 from mtgsdk import Card
+import urllib
+from io import BytesIO, StringIO, BufferedReader
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
 URL_CACHE_DIR="/data/url_cache"
 MTG_CACHE_DIR="/data/mtg_cache"
 
@@ -45,6 +49,7 @@ MTG_CACHE_DIR="/data/mtg_cache"
 
 async def http_download(url: str, path: str):
     async with aiohttp.ClientSession() as session:
+        logger.debug(f"HTTP GET: {url}")
         async with session.get(url) as resp:
             if resp.status == 200:
                 f = await aiofiles.open(path, mode='wb')
@@ -53,77 +58,57 @@ async def http_download(url: str, path: str):
                 return path
             raise RuntimeError(f"Bad HTTP response ({resp.status}) for url: {url}")
 
-async def cache_http_download(url):
+async def cache_http_download(url, label=""):
     """Download URL to a file, and cache for the future"""
     hash = hashlib.sha256(url.encode("utf-8")).hexdigest()
     directory = os.path.join(URL_CACHE_DIR, hash[:2], hash[2:4])
-    path = os.path.join(directory, hash)
+    domain = urllib.parse.urlparse(url).netloc
+    path = os.path.join(directory, f"{label}-{hash}")
     if os.path.exists(path):
+        logger.debug(f"returning cached path for {url}: {path}")
         return path
     os.makedirs(directory, exist_ok=True)
     return await http_download(url, path)
 
+async def cache_http_get(url):
+    path = await cache_http_download(url)
+    f = await aiofiles.open(path, mode="r")
+    return await f.read()
 
 async def send_image_to_room(
-    client: AsyncClient,
-    room_id: str,
-    image: str):
+        client: AsyncClient,
+        room_id: str,
+        im: Image,
+        name: str = ""):
     """Send image to room.
 
     Arguments:
     ---------
     client : Client
     room_id : str
-    image : str, file name of image
-
-    This is a working example for a JPG image.
-        "content": {
-            "body": "someimage.jpg",
-            "info": {
-                "size": 5420,
-                "mimetype": "image/jpeg",
-                "thumbnail_info": {
-                    "w": 100,
-                    "h": 100,
-                    "mimetype": "image/jpeg",
-                    "size": 2106
-                },
-                "w": 100,
-                "h": 100,
-                "thumbnail_url": "mxc://example.com/SomeStrangeThumbnailUriKey"
-            },
-            "msgtype": "m.image",
-            "url": "mxc://example.com/SomeStrangeUriKey"
-        }
-
+    image : PIL Image
     """
-    mime_type = file_type_finder.from_file(image, mime=True)  # e.g. "image/jpeg"
-    if not mime_type.startswith("image/"):
-        print("Drop message because file does not have an image mime type.")
-        return
-    file_extension = mimetypes.guess_extension(mime_type) or ''
-
-    im = Image.open(image)
     (width, height) = im.size  # im.size returns (width,height) tuple
-
+    buffer = BytesIO()
+    im.save(buffer, "JPEG", quality=80)
+    buffer_size = buffer.tell()
+    buffer.seek(0)
     # first do an upload of image, then send URI of upload to room
-    file_stat = await aiofiles.os.stat(image)
-    async with aiofiles.open(image, "r+b") as f:
-        resp, maybe_keys = await client.upload(
-            f,
-            content_type=mime_type,  # image/jpeg
-            filename=f"{os.path.basename(image)}{file_extension}",
-            filesize=file_stat.st_size)
+    resp, maybe_keys = await client.upload(
+        BufferedReader(buffer),
+        content_type="image/jpeg",
+        filename=f"{name}.jpg",
+        filesize=buffer_size)
     if (isinstance(resp, UploadResponse)):
         print("Image was uploaded successfully to server. ")
     else:
         print(f"Failed to upload image. Failure response: {resp}")
 
     content = {
-        "body": os.path.basename(image),  # descriptive title
+        "body": name,  # descriptive title
         "info": {
-            "size": file_stat.st_size,
-            "mimetype": mime_type,
+            "size": buffer_size,
+            "mimetype": "image/jpeg",
             "thumbnail_info": None,  # TODO
             "w": width,  # width in pixel
             "h": height,  # height in pixel
@@ -140,8 +125,8 @@ async def send_image_to_room(
             content=content
         )
         print("Image was sent successfully")
-    except Exception:
-        print(f"Image send of file {image} failed.")
+    except Exception as e:
+        print(f"Image send of file {image} failed. {e}")
 
 async def send_text_to_room(
     client: AsyncClient,
@@ -190,7 +175,6 @@ async def send_text_to_room(
         )
     except SendRetryError:
         logger.exception(f"Unable to send message response to {room_id}")
-
 
 def command_syntax(syntax: str):
     """Defines the syntax for a function, and informs the user if it is violated

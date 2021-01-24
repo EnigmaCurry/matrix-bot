@@ -23,7 +23,6 @@ from matrix_reminder_bot.storage import Storage
 
 logger = logging.getLogger(__name__)
 
-
 async def main():
     # Read config file
     # A different config file path can be specified as the first command line arg

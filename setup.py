@@ -41,7 +41,11 @@ setup(
         "mtgsdk>=1.3.1",
         "python-magic>=0.4.18",
         "aiohttp>=3.7.3",
-        "Pillow>=8.0.1"
+        "Pillow>=8.0.1",
+        "svglib>=1.0.1",
+        "Authlib>=0.15.3",
+        "httpx>=0.16.1",
+        "TheNounProjectAPI"
     ],
     extras_require={
         "postgres": ["psycopg2>=2.8.5"],

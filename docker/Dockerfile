@@ -40,6 +40,8 @@ RUN apk add --no-cache \
     libffi-dev \
     yaml-dev \
     python3-dev \
+    libxml2-dev \
+    libxslt-dev \
     # Pillow depenencies
     jpeg-dev \
     zlib-dev \
@@ -48,7 +50,7 @@ RUN apk add --no-cache \
     openjpeg-dev \
     tiff-dev \
     tk-dev \
-    tcl-dev
+    tcl-dev 
 
 # Also build the libolm python bindings and place them at /python-libs
 # We will later copy contents from both of these folders to the runtime
@@ -107,7 +109,10 @@ RUN apk add --no-cache \
     openjpeg \
     tiff \
     tk \
-    tcl 
+    tcl \
+    libxml2 \
+    libxslt 
+
 
 # Specify a volume that holds the config file, SQLite3 database,
 # and the matrix-nio store

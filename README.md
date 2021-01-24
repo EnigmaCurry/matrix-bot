@@ -31,3 +31,9 @@ podman run --rm -it -v matrix-bot-data:/data -v ./config.yaml:/data/config.yaml 
 ```
 
 Invite the bot to whatever channel you want.
+
+## Mount host filesystem to run code in DEV
+
+```bash
+podman run --rm -it -v matrix-bot-data:/data -v ./config.yaml:/data/config.yaml -v $(pwd):/data/src --entrypoint python --workdir /data/src/ enigmacurry/matrix-bot matrix-reminder-bot
+```

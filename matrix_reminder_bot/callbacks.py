@@ -1,3 +1,4 @@
+import re
 import logging
 
 from nio import (
@@ -12,13 +13,25 @@ from nio import (
 from matrix_reminder_bot.bot_commands import Command
 from matrix_reminder_bot.config import CONFIG
 from matrix_reminder_bot.errors import CommandError
-from matrix_reminder_bot.functions import send_text_to_room
+from matrix_reminder_bot.functions import command_syntax, \
+    cache_http_download, cache_http_get, send_text_to_room, \
+    send_image_to_room
+from matrix_reminder_bot.image import remove_transparency, thumbnail, svg_to_img
 from matrix_reminder_bot.storage import Storage
 
-logger = logging.getLogger(__name__)
+import json
+import random
+import tempfile
+from PIL import Image
 
+import TheNounProjectAPI
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 import time
 TIME_STARTUP = time.time() * 1000
+
+from .api_keys import noun_project_api_key, noun_project_secret_key
 
 class Callbacks(object):
     """Callback methods that fire on certain matrix events
@@ -30,7 +43,13 @@ class Callbacks(object):
 
     def __init__(self, client: AsyncClient, store: Storage):
         self.client = client
+        import pprint
         self.store = store
+        self.meme_regex = re.compile(":[^ ]+:[^ ]*")
+        self.username = CONFIG.user_id.lstrip("@").split(":")[0]
+        self.mention_re = re.compile(f"^(.*\W)?{self.username}(\W.*)?$")
+        self.greeting_re = re.compile(f"(.*\W)?([Hh]i|[Hh]ey|[Hh]ello|[Yy]o|[Gg]reetings|[Gg]ood morning|[Gg]ood afternoon|[Gg]ood night)(\W.*)?$")
+        print(self.client.user)
 
     async def message(self, room: MatrixRoom, event: RoomMessageText):
         """Callback for when a message event is received"""
@@ -47,48 +66,75 @@ class Callbacks(object):
         if event.server_timestamp < TIME_STARTUP:
             return
 
-        # Check whether this is a command
-        #
-        # We use event.body here as formatted bodies can start with <p> instead of the
-        # command prefix
-        if not event.body.startswith(CONFIG.command_prefix):
-            return
+        logger.debug(msg)
 
-        # It's possible to erraneous HTML tags to appear before the command prefix when
-        # making use of event.formatted_body. Typically <p> when commands include newlines
-        # This can cause the command code to break.
-        #
-        # We've already determined this is a command, so strip everything in the msg before
-        # the first instance of the command prefix as a workaround
-        prefix_index = msg.find(CONFIG.command_prefix)
-        if prefix_index != -1:
-            msg = msg[prefix_index:]
-        else:
-            # This formatted body doesn't contain the command prefix for some reason.
-            # Use event.body instead then
-            msg = event.body
+        ## Useful idioms:
+        # command = Command(self.client, self.store, msg, room, event)
+        # await send_text_to_room(self.client, room.room_id, msg)
+        # logger.exception("Unknown error while processing command:")
 
-        logger.debug("Command received: %s", msg)
+        if self.mention_re.search(msg):
+            greeting = self.greeting_re.search(msg)
+            if greeting:
+                await send_text_to_room(self.client, room.room_id, msg.replace(self.username, self.client.get_displayname(event.sender)))
 
-        # Assume this is a command and attempt to process
-        command = Command(self.client, self.store, msg, room, event)
-
-        try:
-            await command.process()
-        except CommandError as e:
-            # An expected error occurred. Inform the user
-            msg = f"Error: {e.msg}"
-            await send_text_to_room(self.client, room.room_id, msg)
-
-            # Print traceback
-            logger.exception("CommandError while processing command:")
-        except Exception as e:
-            # An unknown error occurred. Inform the user
-            msg = f"An unknown error occurred: {e}"
-            await send_text_to_room(self.client, room.room_id, msg)
-
-            # Print traceback
-            logger.exception("Unknown error while processing command:")
+        for m in self.meme_regex.findall(msg):
+            parts = m.split(":")[1:]
+            term = parts[0].replace("_"," ")
+            criteria = parts[1:]
+            criteria.append("icon")
+            ## Attempt several times to find an image
+            backends = ["iconduck"]
+            for attempt in range(1):
+                try:
+                    backend = random.choice(backends)
+                    logger.debug(f"Querying {backend} with term: {term}")
+                except IndexError:
+                    logger.debug("Ran out of backends to try!")
+                    break
+                if backend == "iconduck":
+                    result = json.loads(await cache_http_get(
+                        f"https://iconduck.com/api/v1/vectors/search?query={term}&key=test"))
+                    if len(result['objects']) == 0:
+                        backends.remove("iconduck")
+                        logger.debug(f"No results: {backend}")
+                        continue
+                    obj = random.choice(result['objects'])
+                    img_path = await cache_http_download(obj['assets'][0]['url'])
+                    if obj['contentType'].startswith('image/svg'):
+                        try:
+                            img = svg_to_img(img_path)
+                        except TypeError:
+                            if len(result['objects']) == 1:
+                                backends.remove("iconduck")
+                            logger.debug(f"Could not render SVG from {backend}")
+                            continue
+                        logger.debug(f"img: {img}")
+                        img = remove_transparency(img)
+                        img = thumbnail(img)
+                        await send_image_to_room(self.client, room.room_id, img)
+                        return
+                    else:
+                        logger.info(obj['contentType'])
+                elif backend == "thenounproject":
+                    api = TheNounProjectAPI.API(key=noun_project_api_key, secret=noun_project_secret_key)
+                    try:
+                        icons = api.get_icons_by_term(term, public_domain_only=False, limit=10)
+                    except:
+                        continue
+                    if len(icons) == 0:
+                        backends.remove("thenounproject")
+                        continue
+                    icon = random.choice(icons)
+                    img_path = await cache_http_download(icon['preview_url'], f"{term}-noun")
+                    img = Image.open(img_path)
+                    logger.debug(f"img: {img}")
+                    img = remove_transparency(img)
+                    logger.debug(f"img: {img}")
+                    img = thumbnail(img)
+                    logger.debug(f"img: {img}")
+                    await send_image_to_room(self.client, room.room_id, img)
+                    return
 
     async def invite(self, room: MatrixRoom, event: InviteMemberEvent):
         """Callback for when an invite is received. Join the room specified in the invite"""
