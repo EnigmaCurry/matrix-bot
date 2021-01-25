@@ -76,7 +76,7 @@ class Callbacks(object):
         if self.mention_re.search(msg):
             greeting = self.greeting_re.search(msg)
             if greeting:
-                await send_text_to_room(self.client, room.room_id, msg.replace(self.username, self.client.get_displayname(event.sender)))
+                await send_text_to_room(self.client, room.room_id, msg.replace(self.username, (await self.client.get_displayname(event.sender)).displayname))
 
         for m in self.meme_regex.findall(msg):
             parts = m.split(":")[1:]

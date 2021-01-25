@@ -37,3 +37,9 @@ Invite the bot to whatever channel you want.
 ```bash
 podman run --rm -it -v matrix-bot-data:/data -v ./config.yaml:/data/config.yaml -v $(pwd):/data/src --entrypoint python --workdir /data/src/ enigmacurry/matrix-bot matrix-reminder-bot
 ```
+
+## Access sqlalchemy session in virtualenv
+
+```bash
+PYTHONSTARTUP=database.py ipython
+```

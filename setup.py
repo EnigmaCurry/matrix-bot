@@ -45,7 +45,8 @@ setup(
         "svglib>=1.0.1",
         "Authlib>=0.15.3",
         "httpx>=0.16.1",
-        "TheNounProjectAPI"
+        "TheNounProjectAPI",
+        "sqlalchemy>=1.4.0b1"
     ],
     extras_require={
         "postgres": ["psycopg2>=2.8.5"],
@@ -54,6 +55,7 @@ setup(
             "flake8==3.8.3",
             "flake8-comprehensions==3.2.3",
             "black==19.10b0",
+            "sqlalchemy_schemadisplay"
         ],
     },
     classifiers=[
