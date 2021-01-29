@@ -48,7 +48,7 @@ class Callbacks(object):
         self.meme_regex = re.compile(":[^ ]+:[^ ]*")
         self.username = CONFIG.user_id.lstrip("@").split(":")[0]
         self.mention_re = re.compile(f"^(.*\W)?{self.username}(\W.*)?$")
-        self.greeting_re = re.compile(f"(.*\W)?([Hh]i|[Hh]ey|[Hh]ello|[Yy]o|[Gg]reetings|[Gg]ood morning|[Gg]ood afternoon|[Gg]ood night)(\W.*)?$")
+        self.greeting_re = re.compile(f"(.*\W)?([Hh]i|[Hh]ey|[Hh]ello|[Yy]o|[Gg]reetings|[Gg]ood morning|[Gg]ood afternoon|[Gg]ood night|[Hh]owdy)(\W.*)?$")
         print(self.client.user)
 
     async def message(self, room: MatrixRoom, event: RoomMessageText):

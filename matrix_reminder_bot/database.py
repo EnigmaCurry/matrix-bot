@@ -99,6 +99,19 @@ def test_data():
         s.add(term)
         s.commit()
 
+def make_db_diagram(image_path):
+    from database import mapper_registry
+
+    from sqlalchemy_schemadisplay import create_schema_graph
+
+    graph = create_schema_graph(metadata=mapper_registry.metadata,
+                                show_datatypes=False,
+                                show_indexes=False,
+                                rankdir="LR",
+                                concentrate=False)
+    graph.write_png(image_path)
+
+
 mapper_registry.metadata.create_all()
 test_data()
 

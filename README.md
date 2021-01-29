@@ -3,15 +3,6 @@
 This is a Matrix bot forked from
 [anoadragon453/matrix-reminder-bot](https://github.com/anoadragon453/matrix-reminder-bot)
 
-Currently it is a Magic: The Gathering card image bot.
-
-```
-!mtg card Scute Mob
-```
-
-Uploads the picture of the card named `Scute Mob` and posted to a matrix
-channel. Card images are cached in the `/data` volume of the container.
-
 ## Setup
 
 Create a Matrix user for the bot, on any homeserver. Copy `sample.config.yaml`
