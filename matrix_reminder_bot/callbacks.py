@@ -1,5 +1,7 @@
 import re
 import logging
+import emoji
+import traceback
 
 from nio import (
     AsyncClient,
@@ -17,6 +19,7 @@ from matrix_reminder_bot.functions import command_syntax, \
     cache_http_download, cache_http_get, send_text_to_room, \
     send_image_to_room
 from matrix_reminder_bot.image import remove_transparency, thumbnail, svg_to_img
+from matrix_reminder_bot.emoji_grid import emoji_grid
 from matrix_reminder_bot.storage import Storage
 
 import json
@@ -46,6 +49,7 @@ class Callbacks(object):
         import pprint
         self.store = store
         self.meme_regex = re.compile(":[^ ]+:[^ ]*")
+        self.grid_regex = re.compile("^!(grid[a-zA-Z0-9]*) (.*)")
         self.username = CONFIG.user_id.lstrip("@").split(":")[0]
         self.mention_re = re.compile(f"^(.*\W)?{self.username}(\W.*)?$")
         self.greeting_re = re.compile(f"(.*\W)?([Hh]i|[Hh]ey|[Hh]ello|[Yy]o|[Gg]reetings|[Gg]ood morning|[Gg]ood afternoon|[Gg]ood night|[Hh]owdy)(\W.*)?$")
@@ -73,11 +77,31 @@ class Callbacks(object):
         # await send_text_to_room(self.client, room.room_id, msg)
         # logger.exception("Unknown error while processing command:")
 
+        ## Greetings
         if self.mention_re.search(msg):
             greeting = self.greeting_re.search(msg)
             if greeting:
                 await send_text_to_room(self.client, room.room_id, msg.replace(self.username, (await self.client.get_displayname(event.sender)).displayname))
 
+
+        ## Emoji Grid
+        grid_m = self.grid_regex.match(msg)
+        if grid_m:
+            grid_variation, grid_chars = grid_m.groups()
+            emoji_list = [e['emoji'] for e in emoji.emoji_lis(grid_chars)]
+            try:
+                grid = emoji_grid(grid_chars, variation=grid_variation)
+            except Exception as e:
+                await send_text_to_room(self.client, room.room_id,
+                                        str(e), markdown_convert=False)
+                traceback.print_exc()
+            else:
+                await send_text_to_room(self.client, room.room_id,
+                                        grid,
+                                        markdown_convert=False)
+
+
+        ## Memes
         for m in self.meme_regex.findall(msg):
             parts = m.split(":")[1:]
             term = parts[0].replace("_"," ")

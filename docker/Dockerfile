@@ -22,15 +22,15 @@
 # We use an initial docker container to build all of the runtime dependencies,
 # then transfer those dependencies to the container we're going to ship,
 # before throwing this one away
-ARG PYTHON_VERSION=3.8
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.11 as builder
+ARG PYTHON_VERSION=3.9
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.12 as builder
 
 ##
 ## Build libolm for matrix-nio e2e support
 ##
 
 # Install libolm build dependencies
-ARG LIBOLM_VERSION=3.1.4
+ARG LIBOLM_VERSION=3.2.1
 RUN apk add --no-cache \
     make \
     cmake \
@@ -50,7 +50,10 @@ RUN apk add --no-cache \
     openjpeg-dev \
     tiff-dev \
     tk-dev \
-    tcl-dev 
+    tcl-dev \
+    musl-dev libffi-dev openssl-dev cargo
+
+RUN pip install --upgrade pip
 
 # Also build the libolm python bindings and place them at /python-libs
 # We will later copy contents from both of these folders to the runtime
@@ -88,7 +91,7 @@ RUN pip install --prefix="/python-libs" --no-warn-script-location "/src/.[postgr
 
 # Create the container we'll actually ship. We need to copy libolm and any
 # python dependencies that we built above to this container
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.11
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.12
 
 # Copy python dependencies from the "builder" container
 COPY --from=builder /python-libs /usr/local

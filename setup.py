@@ -46,7 +46,9 @@ setup(
         "Authlib>=0.15.3",
         "httpx>=0.16.1",
         "TheNounProjectAPI",
-        "sqlalchemy>=1.4.0b1"
+        "sqlalchemy>=1.4.0b1",
+        "emoji>=1.2.0",
+        "numpy>=1.20.1"
     ],
     extras_require={
         "postgres": ["psycopg2>=2.8.5"],
