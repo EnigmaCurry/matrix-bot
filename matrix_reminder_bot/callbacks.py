@@ -100,7 +100,6 @@ class Callbacks(object):
                                         grid,
                                         markdown_convert=False)
 
-
         ## Memes
         for m in self.meme_regex.findall(msg):
             parts = m.split(":")[1:]
