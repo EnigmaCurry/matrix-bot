@@ -147,12 +147,26 @@ def grid2D(args):
     grid = grid_from_text(text)
 
     for stage in lines[0].split(";"):
+        in_grid = grid.copy()
         cmd = shlex.split(stage)
+        print(stage)
         if not len(cmd):
             break
         if cmd[0] == "quad_mirror":
-            grid = quad_mirror(grid, overlap="overlap" in cmd[1:])
-
+            grid = quad_mirror(in_grid, overlap="overlap" in cmd[1:])
+        elif cmd[0] == "cat":
+            try:
+                times = int(cmd[1])
+            except Exception:
+                try:
+                    times = int(cmd[2])
+                except Exception:
+                    times = 1
+            for t in range(times - 1):
+                if "right" in cmd[1:]:
+                    grid = join_right(grid, in_grid)
+                else:
+                    grid = join_bottom(grid, in_grid)
     return grid
 
 grid2d = grid2D
@@ -182,9 +196,9 @@ def emoji_grid(args: str, variation: str = 'grid1'):
 
 if __name__ == "__main__":
     variation = sys.argv[1]
-    args = "".join(sys.argv[2:])
+    args = " ".join(sys.argv[2:])
     if variation.lower() == "grid2d":
-        args = """quad_mirror overlap; quad_mirror overlap
+        args = args + """
         🍄💯👅
         🤖👽😹
         """
