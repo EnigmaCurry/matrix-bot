@@ -82,23 +82,26 @@ class Callbacks(object):
             greeting = self.greeting_re.search(msg)
             if greeting:
                 await send_text_to_room(self.client, room.room_id, msg.replace(self.username, (await self.client.get_displayname(event.sender)).displayname))
-
+                return
 
         ## Emoji Grid
         grid_m = self.grid_regex.match(msg)
         if grid_m:
-            grid_variation, grid_chars = grid_m.groups()
-            emoji_list = [e['emoji'] for e in emoji.emoji_lis(grid_chars)]
+            grid_variation, grid_args = grid_m.groups()
+            grid_args = emoji.emojize(grid_args, use_aliases=True)
+            emoji_list = [e['emoji'] for e in emoji.emoji_lis(grid_args)]
             try:
-                grid = emoji_grid(grid_chars, variation=grid_variation)
+                grid = emoji_grid(grid_args, variation=grid_variation)
             except Exception as e:
                 await send_text_to_room(self.client, room.room_id,
                                         str(e), markdown_convert=False)
                 traceback.print_exc()
+                return
             else:
                 await send_text_to_room(self.client, room.room_id,
                                         grid,
                                         markdown_convert=False)
+                return
 
         ## Memes
         for m in self.meme_regex.findall(msg):

@@ -83,9 +83,9 @@ def roll_grid_rows(grid, roll=1, **args):
 
 gridZ = lambda c: np.flip(roll_grid_rows(four_mirror((progressive_grid(c)))), 1)
 
-def emoji_grid(text: str, variation: str = 'grid1'):
-    chars = np.array([get_emoji_id(e['emoji']) for e in emoji.emoji_lis(text)], dtype=np.int)
-    positions = [e['location'] for e in emoji.emoji_lis(text)]
+def emoji_grid(args: str, variation: str = 'grid1'):
+    chars = np.array([get_emoji_id(e['emoji']) for e in emoji.emoji_lis(args)], dtype=np.int)
+    positions = [e['location'] for e in emoji.emoji_lis(args)]
     if variation == 'grid':
         variation = "grid1"
     variations = {
@@ -96,6 +96,7 @@ def emoji_grid(text: str, variation: str = 'grid1'):
         'grid5': lambda c: roll_grid_rows(four_mirror((progressive_grid(c)))),
         'gridM': lambda c: np.rot90(top_mirror(gridZ(c))),
         'gridN': lambda c: np.rot90(gridZ(c)),
+        'gridW': lambda c: np.flip(np.rot90(top_mirror(gridZ(c)))),
         'gridZ': gridZ,
         'grid2D': lambda c: grid_from_text(c, positions=positions)
     }
@@ -111,4 +112,4 @@ def emoji_grid(text: str, variation: str = 'grid1'):
 if __name__ == "__main__":
     variation = sys.argv[1]
     in_txt = "".join(sys.argv[2:])
-    print(emoji_grid(in_txt, variation=sys.argv[1]))
+    print(emoji_grid(emoji.emojize(in_txt, use_aliases=True), variation=sys.argv[1]))
