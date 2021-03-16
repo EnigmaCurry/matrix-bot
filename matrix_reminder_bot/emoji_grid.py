@@ -83,18 +83,6 @@ def top_mirror(in_grid, **args):
 def left_mirror(in_grid, **args):
     return np.rot90(top_mirror(np.rot90(in_grid, -1)))
 
-def four_mirror_square(in_grid, **args):
-    top_left = in_grid
-    bottom_left = np.rot90(top_left,1)
-    bottom_right = np.rot90(top_left,2)
-    top_right = np.rot90(top_left,3)
-    grid = np.zeros(shape=((len(in_grid)*2)-1,(len(in_grid)*2)-1), dtype=int)
-    grid[0:len(in_grid), 0:len(in_grid)] = top_left
-    grid[len(in_grid)-1:, 0:len(in_grid)] = bottom_left
-    grid[len(in_grid)-1:, len(in_grid)-1:] = bottom_right
-    grid[0:len(in_grid), len(in_grid)-1:] = top_right
-    return grid
-
 def roll_rows(grid, roll=1, **args):
     grid = grid.copy()
     for r in range(len(grid)):
@@ -110,7 +98,7 @@ def join_bottom(grid1, grid2, **args):
 def quad(grid):
     return join_bottom(join_right(grid, grid), join_right(grid, grid))
 
-def quad_mirror(in_grid, **args):
+def quad_mirror(in_grid, overlap=True, **args):
     print(in_grid.shape)
     print(f"0:{in_grid.shape[0]}, 0:{in_grid.shape[1]}")
     top_left = in_grid
@@ -118,27 +106,34 @@ def quad_mirror(in_grid, **args):
     top_right = np.flip(in_grid, 1)
     bottom_right = np.flip(top_right, 0)
     grid = np.zeros(shape=(top_left.shape[0]*2, top_left.shape[1]*2), dtype=int)
-    grid[0:in_grid.shape[0], 0:in_grid.shape[1]] = top_left
-    grid[in_grid.shape[0]:in_grid.shape[0]*2, in_grid.shape[1]:in_grid.shape[1]*2] = bottom_right
-    grid[in_grid.shape[0]:in_grid.shape[0]*2, 0:in_grid.shape[1]] = bottom_left
-    grid[0:in_grid.shape[0], in_grid.shape[1]:in_grid.shape[1]*2] = top_right
+    if overlap:
+        grid = np.zeros(shape=(top_left.shape[0]*2 - 1, top_left.shape[1]*2 - 1), dtype=int)
+        grid[0:in_grid.shape[0], 0:in_grid.shape[1]] = top_left
+        grid[in_grid.shape[0]:in_grid.shape[0]*2, in_grid.shape[1]:in_grid.shape[1]*2] = bottom_right[1:,1:]
+        grid[in_grid.shape[0]:in_grid.shape[0]*2, 0:in_grid.shape[1]] = bottom_left[1:,0:]
+        grid[0:in_grid.shape[0], in_grid.shape[1]:in_grid.shape[1]*2] = top_right[0:,1:]
+    else:
+        grid = np.zeros(shape=(top_left.shape[0]*2, top_left.shape[1]*2), dtype=int)
+        grid[0:in_grid.shape[0], 0:in_grid.shape[1]] = top_left
+        grid[in_grid.shape[0]:in_grid.shape[0]*2, in_grid.shape[1]:in_grid.shape[1]*2] = bottom_right
+        grid[in_grid.shape[0]:in_grid.shape[0]*2, 0:in_grid.shape[1]] = bottom_left
+        grid[0:in_grid.shape[0], in_grid.shape[1]:in_grid.shape[1]*2] = top_right
     return grid
 
 grid1 = lambda c: stacked_row(c)
 grid2 = lambda c: roll_rows(grid1(c))
-grid3 = lambda c: four_mirror_square(progressive(c))
-grid4 = lambda c: four_mirror_square(grid3(c))
-grid4X = grid4x = lambda c: four_mirror_square(grid4(c))
+grid3 = lambda c: quad_mirror(progressive(c))
+grid4 = lambda c: quad_mirror(grid3(c))
+grid4X = grid4x = lambda c: quad_mirror(grid4(c))
 grid5 = lambda c: join_right(join_bottom(np.flip(grid2(c), 1), grid1(c)),
                              join_bottom(grid2(c), np.flip(grid1(c), 1)))
 grid6 = lambda c: join_right(top_mirror(grid5(c)), top_mirror(grid5(c)))
-
 gridz = gridZ = lambda c: roll_rows(grid3(c), -1)
 gridm = gridM = lambda c: np.rot90(top_mirror(gridZ(c)))
 gridn = gridN = lambda c: np.rot90(gridZ(c))
 gridw = gridW = lambda c: np.flip(gridM(c))
 gridx = gridX = lambda c: np.roll(top_mirror(grid5(c)), int(0.5 * (-1 * len(grid5(c)))), axis=1)
-grid2d = grid2D = lambda args: quad_mirror(grid_from_text(args))
+grid2d = grid2D = lambda args: quad_mirror(grid_from_text(args), overlap=False)
 
 def emoji_grid(args: str, variation: str = 'grid1'):
     if variation == 'grid':
