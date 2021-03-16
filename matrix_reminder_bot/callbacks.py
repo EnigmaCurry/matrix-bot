@@ -49,7 +49,7 @@ class Callbacks(object):
         import pprint
         self.store = store
         self.meme_regex = re.compile(":[^ ]+:[^ ]*")
-        self.grid_regex = re.compile("^!(grid[a-zA-Z0-9]*) (.*)")
+        self.grid_regex = re.compile("^!(grid[a-zA-Z0-9]*) (.*)", re.DOTALL)
         self.username = CONFIG.user_id.lstrip("@").split(":")[0]
         self.mention_re = re.compile(f"^(.*\W)?{self.username}(\W.*)?$")
         self.greeting_re = re.compile(f"(.*\W)?([Hh]i|[Hh]ey|[Hh]ello|[Yy]o|[Gg]reetings|[Gg]ood morning|[Gg]ood afternoon|[Gg]ood night|[Hh]owdy)(\W.*)?$")
