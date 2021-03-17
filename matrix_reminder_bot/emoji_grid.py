@@ -159,19 +159,20 @@ gridw = gridW = lambda c: np.flip(gridM(c))
 gridx = gridX = lambda c: np.roll(top_mirror(grid5(c)), int(0.5 * (-1 * len(grid5(c)))), axis=1)
 
 ## 2D grid input:
-def grid2D(args):
+def grid2D(args, in_grid=None):
     "2D grid input"
     # parse command and parameters on the first line
     # parse rectangular grid input on subsequent lines
     lines = args.splitlines()
     text = "\n".join(lines[1:])
-    grid = grid_from_text(text)
+    grid = in_grid if in_grid is not None else grid_from_text(text)
 
     def parse_int(cmd, default):
         cmd = cmd[1:]
-        for i in range(10):
+        for i in range(len(cmd)):
             try:
-                return int(cmd[i])
+                print(repr(cmd[i]))
+                return int(re.search(r'^\d+', cmd[i]).group())
             except Exception:
                 pass
         else:
@@ -215,6 +216,8 @@ def grid2D(args):
                 grid = roll_rows(grid, multiple)
         elif cmd[0] == "mirror":
             grid = mirror(in_grid, overlap="overlap" in cmd[1:], axis=1 if "down" not in cmd[1:] else 0)
+        elif cmd[0] == "flip":
+            grid = np.flip(in_grid, axis="right" in cmd[1:])
         elif cmd[0] == "rotate":
             multiple = parse_int(cmd, 1)
             if "right" in cmd[1:]:
@@ -240,8 +243,6 @@ def grid2D(args):
                 else:
                     raise AssertionError("Bad programmer is bad at math")
             factors = squareish_factors(total)
-            print(total)
-            print(factors)
             grid = np.array(message).reshape(*factors)
         elif cmd[0] == "top_mirror":
             grid = top_mirror(grid)
@@ -251,13 +252,15 @@ def grid2D(args):
                 grid = grid[0:num, 0:]
             else:
                 grid = grid[0:, 0:num]
+        else:
+            raise ValueError("grid2d missing command")
     return grid
 grid2d = grid2D
 
 def emoji_grid(args: str, variation: str = 'grid1'):
-    if variation == 'grid':
-        variation = "grid2"
     variation_pattern = re.compile("^grid[a-zA-Z0-9]*$")
+    if variation == 'grid':
+        variation = "grid2D"
     try:
         if not variation_pattern.match(variation):
             raise AssertionError("not a valid variation")
@@ -270,10 +273,21 @@ def emoji_grid(args: str, variation: str = 'grid1'):
     ## Functions either take raw args string or emoji ID array, depending on style:
     if re.match('^grid2d', variation, re.I):
         ## grid2d style passes the unparsed args directly:
-        grid = func(args)
+        print(variation)
+        grid = grid2D(args)
     else:
+        if "|" in args:
+            first_stage = args.split("|")[0]
+        else:
+            first_stage = args
         ## Every other variant passes the parsed array of emoji ids:
-        grid = func(np.array([get_emoji_id(e['emoji']) for e in emoji.emoji_lis(args)], dtype=int))
+        grid = func(np.array([get_emoji_id(e['emoji']) for e in emoji.emoji_lis(first_stage)], dtype=int))
+        ## If there are additional stages, pass the result to grid2d:
+        if "|" in args:
+            rest_args = "|".join(args.splitlines()[0].split("|")[1:]).strip()
+            print(rest_args)
+            if len(rest_args):
+                grid = grid2D(rest_args, in_grid=grid)
     grid = grid_str(grid)
     return grid
 
