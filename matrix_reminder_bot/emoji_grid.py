@@ -54,7 +54,7 @@ def grid_from_text(text):
             else:
                 width = line_width
     grid = np.array([get_emoji_id(e['emoji']) for e in \
-                     emoji.emoji_lis("".join(chars))]).reshape(height, width)
+                     emoji.emoji_lis("".join(chars))], dtype=int).reshape(height, width)
     return grid
 
 def stacked_row(row):
@@ -102,8 +102,6 @@ def quad(grid):
     return join_bottom(join_right(grid, grid), join_right(grid, grid))
 
 def quad_mirror(in_grid, overlap=False):
-    print(in_grid.shape)
-    print(f"0:{in_grid.shape[0]}, 0:{in_grid.shape[1]}")
     top_left = in_grid
     bottom_left = np.flip(in_grid, 0)
     top_right = np.flip(in_grid, 1)
@@ -138,6 +136,7 @@ gridn = gridN = lambda c: np.rot90(gridZ(c))
 gridw = gridW = lambda c: np.flip(gridM(c))
 gridx = gridX = lambda c: np.roll(top_mirror(grid5(c)), int(0.5 * (-1 * len(grid5(c)))), axis=1)
 
+## 2D grid input:
 def grid2D(args):
     "2D grid input"
     # parse command and parameters on the first line
@@ -146,27 +145,44 @@ def grid2D(args):
     text = "\n".join(lines[1:])
     grid = grid_from_text(text)
 
+    def parse_int(cmd, default):
+        cmd = cmd[1:]
+        for i in range(10):
+            try:
+                return int(cmd[i])
+            except Exception:
+                pass
+        else:
+            return default
+
     for stage in lines[0].split(";"):
         in_grid = grid.copy()
         cmd = shlex.split(stage)
-        print(stage)
         if not len(cmd):
             break
         if cmd[0] == "quad_mirror":
             grid = quad_mirror(in_grid, overlap="overlap" in cmd[1:])
         elif cmd[0] == "cat":
-            try:
-                times = int(cmd[1])
-            except Exception:
-                try:
-                    times = int(cmd[2])
-                except Exception:
-                    times = 1
+            times = parse_int(cmd, 1)
             for t in range(times - 1):
                 if "right" in cmd[1:]:
                     grid = join_right(grid, in_grid)
                 else:
                     grid = join_bottom(grid, in_grid)
+        elif cmd[0] == "pad":
+            chars = [e['emoji'] for e in emoji.emoji_lis("".join(cmd[1:]))]
+            size = parse_int(cmd, None)
+            if size is not None and len(chars) > 1:
+                raise AssertionError("Pad accepts only one emoji input, when a number is also specified.")
+            elif size is not None and len(chars) == 1:
+                v = (get_emoji_id(chars[0]),)
+                grid = np.pad(in_grid, pad_width=size, mode="constant", constant_values=v)
+            elif size is not None and "mean" in cmd[1:]:
+                grid = np.pad(in_grid, pad_width=size, mode="mean")
+            elif size is not None:
+                grid = np.pad(in_grid, pad_width=size, mode="edge")
+            else:
+                pass
     return grid
 
 grid2d = grid2D
