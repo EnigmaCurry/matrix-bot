@@ -92,6 +92,9 @@ def roll_rows(grid, roll=1):
         grid[r] = np.roll(grid[r], roll*r)
     return grid
 
+def roll_cols(grid, roll=1):
+    return np.rot90(roll_rows(np.rot90(grid)), -1)
+
 def join_right(grid1, grid2):
     return np.concatenate((grid1, grid2), axis=1, dtype=int)
 
@@ -100,6 +103,17 @@ def join_bottom(grid1, grid2):
 
 def quad(grid):
     return join_bottom(join_right(grid, grid), join_right(grid, grid))
+
+def mirror(in_grid, overlap=False, axis=0):
+    other = np.flip(in_grid.copy(), axis)
+    if axis:
+        if overlap:
+            other = other[0:,1:]
+        return join_right(in_grid, other)
+    else:
+        if overlap:
+            other = other[1:,0:]
+        return join_bottom(in_grid, other)
 
 def quad_mirror(in_grid, overlap=False):
     top_left = in_grid
@@ -119,6 +133,14 @@ def quad_mirror(in_grid, overlap=False):
         grid[in_grid.shape[0]:in_grid.shape[0]*2, in_grid.shape[1]:in_grid.shape[1]*2] = bottom_right
         grid[in_grid.shape[0]:in_grid.shape[0]*2, 0:in_grid.shape[1]] = bottom_left
         grid[0:in_grid.shape[0], in_grid.shape[1]:in_grid.shape[1]*2] = top_right
+    return grid
+
+def border(in_grid, sequence):
+    grid = np.zeros(shape=(in_grid.shape[0]+len(sequence)*2,
+                           in_grid.shape[1]+len(sequence)*2), dtype=int)
+    for i in range(len(sequence)):
+        grid[i:grid.shape[0]-i,i:grid.shape[1]-i] = get_emoji_id(sequence[i])
+    grid[len(sequence):len(sequence)+in_grid.shape[0], len(sequence):len(sequence)+in_grid.shape[1]] = in_grid
     return grid
 
 ## 1D sequential input:
@@ -181,10 +203,19 @@ def grid2D(args):
                 grid = np.pad(in_grid, pad_width=size, mode="mean")
             elif size is not None:
                 grid = np.pad(in_grid, pad_width=size, mode="edge")
+            elif len(chars) > 0:
+                grid = border(in_grid, sequence=chars)
             else:
-                pass
+                grid = np.pad(in_grid, pad_width=1, mode="edge")
+        elif cmd[0] == "roll":
+            multiple = parse_int(cmd, 1)
+            if "down" in cmd[1:]:
+                grid = roll_cols(grid, multiple)
+            else:
+                grid = roll_rows(grid, multiple)
+        elif cmd[0] == "mirror":
+            grid = mirror(in_grid, overlap="overlap" in cmd[1:], axis=1 if "down" not in cmd[1:] else 0)
     return grid
-
 grid2d = grid2D
 
 def emoji_grid(args: str, variation: str = 'grid1'):
