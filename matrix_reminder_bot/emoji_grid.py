@@ -195,7 +195,7 @@ def grid2D(args):
             chars = [e['emoji'] for e in emoji.emoji_lis("".join(cmd[1:]))]
             size = parse_int(cmd, None)
             if size is not None and len(chars) > 1:
-                raise AssertionError("Pad accepts only one emoji input, when a number is also specified.")
+                raise AssertionError("When you pad with a number, it only accepts ONE emoji input.")
             elif size is not None and len(chars) == 1:
                 v = (get_emoji_id(chars[0]),)
                 grid = np.pad(in_grid, pad_width=size, mode="constant", constant_values=v)
@@ -220,8 +220,29 @@ def grid2D(args):
             if "right" in cmd[1:]:
                 multiple = -1 * multiple
             grid = np.rot90(in_grid, multiple)
-        elif cmd[0] == "random":
-            pass
+        elif cmd[0] == "fortune":
+            # Mystique example: fortune 30🔵 10🔴 5💶 5🥇 5🎹
+            # Find all integers, all emoji, and assert quantity of each are equal:
+            nums = [int(x) for x in re.findall('\d+', " ".join(cmd[1:]))]
+            total = sum(nums)
+            chars = [get_emoji_id(e['emoji']) for e in emoji.emoji_lis("".join(cmd[1:]))]
+            if not len(nums) or len(nums) != len(chars):
+                raise ValueError("fortune requires a list of: Quantity + Emoji like: 30🔵 10🔴 5💶 5🥇 5🎹")
+            nums = zip(nums, chars)
+            flatten = lambda t: [item for sublist in t for item in sublist]
+            message = flatten([[char for _ in range(num)] for num, char in nums])
+            random.shuffle(message)
+            # Calculate factors to make a rectangular grid:
+            def squareish_factors(n: int):
+                for i in range(int(math.sqrt(n)), 0, -1):
+                    if n % i == 0:
+                        return (i, int(n/i))
+                else:
+                    raise AssertionError("Bad programmer is bad at math")
+            factors = squareish_factors(total)
+            print(total)
+            print(factors)
+            grid = np.array(message).reshape(*factors)
         elif cmd[0] == "top_mirror":
             grid = top_mirror(grid)
         elif cmd[0] == "cut":
