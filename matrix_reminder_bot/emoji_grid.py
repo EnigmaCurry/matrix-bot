@@ -177,7 +177,7 @@ def grid2D(args):
         else:
             return default
 
-    for stage in lines[0].split(";"):
+    for stage in lines[0].split("|"):
         in_grid = grid.copy()
         cmd = shlex.split(stage)
         if not len(cmd):
@@ -215,6 +215,21 @@ def grid2D(args):
                 grid = roll_rows(grid, multiple)
         elif cmd[0] == "mirror":
             grid = mirror(in_grid, overlap="overlap" in cmd[1:], axis=1 if "down" not in cmd[1:] else 0)
+        elif cmd[0] == "rotate":
+            multiple = parse_int(cmd, 1)
+            if "right" in cmd[1:]:
+                multiple = -1 * multiple
+            grid = np.rot90(in_grid, multiple)
+        elif cmd[0] == "random":
+            pass
+        elif cmd[0] == "top_mirror":
+            grid = top_mirror(grid)
+        elif cmd[0] == "cut":
+            num = parse_int(cmd, 1)
+            if "top" in cmd[1:]:
+                grid = grid[0:num, 0:]
+            else:
+                grid = grid[0:, 0:num]
     return grid
 grid2d = grid2D
 
