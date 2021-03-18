@@ -12,6 +12,8 @@ circle_emoji = np.array(
         "purple","brown","black","white"]])
 
 warning_emoji = emoji.emojize(":warning:")
+variation_pattern = re.compile("^grid[a-zA-Z0-9]*$")
+EN_emoji = list(emoji.core.unicode_codes.EMOJI_UNICODE['en'].values())
 
 ## memoize emoji code numbers - don't use the actual unicode code points, just
 ## assign an incrementing ID number, so that we can use normal integers in
@@ -27,17 +29,20 @@ def get_emoji_id(chars):
         EMOJI_ID_MAP[ID] = chars
     return ID
 
-def grid_str(array):
+def grid_str(array, small=False):
     "Convert numpy grid to a string of emoji text"
+    lines = []
     if len(array.shape) < 2:
-        return "".join([EMOJI_ID_MAP[x] for x in array])
+        lines.append("".join([EMOJI_ID_MAP[x] for x in array]))
     elif len(array.shape) < 3:
-        lines = []
         for row in array:
             lines.append("".join([EMOJI_ID_MAP[x] for x in row]))
-        return "\n".join(lines)
     else:
         raise NotImplementedError("Not implemented for >2 dimensions")
+    if small:
+        # Add some text so as to defeat the 2x embiggening that Element does to emoji-only messages
+        lines.append('.')
+    return "\n".join(lines)
 
 def grid_from_text(text):
     text = text.strip().replace(" ","")
@@ -156,7 +161,7 @@ gridz = gridZ = lambda c: roll_rows(grid3(c), -1)
 gridm = gridM = lambda c: np.rot90(top_mirror(gridZ(c)))
 gridn = gridN = lambda c: np.rot90(gridZ(c))
 gridw = gridW = lambda c: np.flip(gridM(c))
-gridx = gridX = lambda c: np.roll(top_mirror(grid5(c)), int(0.5 * (-1 * len(grid5(c)))), axis=1)
+gridx = gridX = lambda c: quad_mirror(grid2(c))
 
 ## 2D grid input:
 def grid2D(args, in_grid=None):
@@ -168,12 +173,13 @@ def grid2D(args, in_grid=None):
     grid = in_grid if in_grid is not None else grid_from_text(text)
 
     def parse_int(cmd, default):
-        cmd = cmd[1:]
+        if type(cmd) == str:
+            cmd = cmd.split(" ")
         for i in range(len(cmd)):
             try:
-                print(repr(cmd[i]))
                 return int(re.search(r'^\d+', cmd[i]).group())
-            except Exception:
+            except Exception as e:
+                print(e)
                 pass
         else:
             return default
@@ -186,7 +192,7 @@ def grid2D(args, in_grid=None):
         if cmd[0] == "quad_mirror":
             grid = quad_mirror(in_grid, overlap="overlap" in cmd[1:])
         elif cmd[0] == "cat":
-            times = parse_int(cmd, 1)
+            times = parse_int(cmd[1:], 1)
             for t in range(times - 1):
                 if "right" in cmd[1:]:
                     grid = join_right(grid, in_grid)
@@ -194,7 +200,7 @@ def grid2D(args, in_grid=None):
                     grid = join_bottom(grid, in_grid)
         elif cmd[0] == "pad":
             chars = [e['emoji'] for e in emoji.emoji_lis("".join(cmd[1:]))]
-            size = parse_int(cmd, None)
+            size = parse_int(cmd[1:], None)
             if size is not None and len(chars) > 1:
                 raise AssertionError("When you pad with a number, it only accepts ONE emoji input.")
             elif size is not None and len(chars) == 1:
@@ -209,7 +215,7 @@ def grid2D(args, in_grid=None):
             else:
                 grid = np.pad(in_grid, pad_width=1, mode="edge")
         elif cmd[0] == "roll":
-            multiple = parse_int(cmd, 1)
+            multiple = parse_int(cmd[1:], 1)
             if "down" in cmd[1:]:
                 grid = roll_cols(grid, multiple)
             else:
@@ -219,7 +225,7 @@ def grid2D(args, in_grid=None):
         elif cmd[0] == "flip":
             grid = np.flip(in_grid, axis="right" in cmd[1:])
         elif cmd[0] == "rotate":
-            multiple = parse_int(cmd, 1)
+            multiple = parse_int(cmd[1:], 1)
             if "right" in cmd[1:]:
                 multiple = -1 * multiple
             grid = np.rot90(in_grid, multiple)
@@ -247,18 +253,138 @@ def grid2D(args, in_grid=None):
         elif cmd[0] == "top_mirror":
             grid = top_mirror(grid)
         elif cmd[0] == "cut":
-            num = parse_int(cmd, 1)
+            num = parse_int(cmd[1:], 1)
             if "top" in cmd[1:]:
                 grid = grid[0:num, 0:]
             else:
                 grid = grid[0:, 0:num]
+        elif cmd[0] == "small":
+            pass #handled in emoji_grid
+        elif cmd[0] == "random":
+            width = parse_int(cmd[1], None)
+            height = parse_int(cmd[2], None)
+            if width is None or height is None:
+                raise ValueError("Random requires width and height as integers")
+            chars = []
+            for i in range(width*height):
+                while True:
+                    r = random.choice(EN_emoji)
+                    ## Only accept single character emoji
+                    if len(r) == 1:
+                        break
+                    else:
+                        print(len(r))
+                chars.append(get_emoji_id(r))
+            grid = np.array(chars).reshape(width, height)
         else:
             raise ValueError("grid2d missing command")
     return grid
 grid2d = grid2D
 
+def help_text():
+    return f"""# Emoji Grids
+Make emoji grids by creating a pipeline, each stage of the
+pipeline receives input from the previous stage, like a UNIX shell:
+
+```
+!grid COMMAND [OPTIONS ...] | COMMAND [OPTIONS ...] | ....
+```
+
+## Grid commands and options:
+
+A command consists of one stage in the overall pipeline, which is all the text
+before the next `|` character, consisting of the command name (the first word)
+and the list of options (all the rest of the words before the next `|`
+character). If the options are listed in brackets [] the option is not required
+to be specified, and shows the default value that will be used in its place.
+
+ * `cat [right] [N=1]` - concatenate grid down or [right] N times.
+
+    Examples:  `cat 3`, `cat right 2`
+
+    Note: `cat` without any N specified, is identical to its input.
+
+ * `quad_mirror [overlap]` - mirror grid veritically and horizontally.
+    If `overlap` is specified, the border between will not be duplicated.
+
+ * `pad EMOJI` - pad the input grid with a border.
+
+    EMOJI specifies the emoji to pad. Can specify a sequence or
+    a single emoji with a number multiplier.
+
+    Examples: `pad 🎹🥇`, `pad 2🔵`
+ * `roll [down] [multiple=1]` - shift each row of the grid in a cascading pattern.
+
+    By default rows are shifted left or right. If `down` is specified, columns
+    are shifted up or down instead.
+
+    Examples: `roll`, `roll down`, `roll down 2`, `roll 3`
+
+ * `flip [right]` - Flip the entire grid upside down, or right side over.
+
+    Examples: `flip`, `flip right`
+
+ * `rotate [multiple=1]` - Rotate the grid
+
+    multiple specifies the direction and how many times. Positive goes
+    counter-clockwise, while negative goes clockwise (seems backwards I know.)
+
+ * `fortune [N EMOJI] [N EMOJI] ...` - Randomize grid positions from input
+
+    Examples: `fortune 30🔵 10🔴 5💶 5🥇 5🎹`
+
+ * `top_mirror` - Mirror the top half of the grid 
+    (no options)
+
+ * `cut [top]` - Chop off part of the grid.
+
+    top specifies to cut from the top of the grid, otherwise cut from the left of the grid.
+
+    Examples: `cut 5`, `cut top 4`
+
+ * `small` - Force the output of the emoji to be small (Element Desktop only)
+
+ * `random WIDTH HEIGHT` - Ignore input entirely and create a new grid of
+   completely random emoji - width and height should be integer numbers.
+
+## Grid generators
+
+The following grid generators exist, which you may invoke as the _first_ grid command only.
+
+{", ".join([func for func in globals() if variation_pattern.match(str(func))])}
+
+These can be followed by any of the pipeline command from above, for example:
+
+```
+!gridW 🔵🔴💶🥇🎹 | cat 2 right | small
+```
+
+## Two dimensional input
+
+If you don't use one of the grid generators as the first command, you can
+instead provide the input grid yourself as a two dimensional array. Simply type
+the command as normal, and starting on the second line type the emoji grid to
+use as input. Example (this is a single message on three lines:)
+
+```
+!grid quad_mirror
+```
+
+`🤾‍♂️🤾‍♀️🏌️‍♀️🏌️‍♂️`
+
+`🥏🎱🏓🏸`
+
+
+## Examples to try yourself
+ * `!grid1 👟👠🪜`
+ * `!grid2 👟👠🪜`
+ * `!grid2 👟👠🪜 | quad_mirror`
+"""
+
+
 def emoji_grid(args: str, variation: str = 'grid1'):
-    variation_pattern = re.compile("^grid[a-zA-Z0-9]*$")
+    if re.search("(^|\W)help($|\W)",args):
+        return help_text()
     if variation == 'grid':
         variation = "grid2D"
     try:
@@ -273,7 +399,6 @@ def emoji_grid(args: str, variation: str = 'grid1'):
     ## Functions either take raw args string or emoji ID array, depending on style:
     if re.match('^grid2d', variation, re.I):
         ## grid2d style passes the unparsed args directly:
-        print(variation)
         grid = grid2D(args)
     else:
         if "|" in args:
@@ -285,10 +410,9 @@ def emoji_grid(args: str, variation: str = 'grid1'):
         ## If there are additional stages, pass the result to grid2d:
         if "|" in args:
             rest_args = "|".join(args.splitlines()[0].split("|")[1:]).strip()
-            print(rest_args)
             if len(rest_args):
                 grid = grid2D(rest_args, in_grid=grid)
-    grid = grid_str(grid)
+    grid = grid_str(grid, small=re.search("(^|\W)small($|\W)",args))
     return grid
 
 if __name__ == "__main__":

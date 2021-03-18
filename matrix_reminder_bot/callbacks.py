@@ -90,17 +90,20 @@ class Callbacks(object):
             grid_variation, grid_args = grid_m.groups()
             grid_args = emoji.emojize(grid_args, use_aliases=True)
             emoji_list = [e['emoji'] for e in emoji.emoji_lis(grid_args)]
+            use_markdown = False
             try:
                 grid = emoji_grid(grid_args, variation=grid_variation)
+                if grid_args.strip().startswith("help"):
+                    use_markdown = True
             except Exception as e:
                 await send_text_to_room(self.client, room.room_id,
-                                        str(e), markdown_convert=False)
+                                        str(e), markdown_convert=use_markdown)
                 traceback.print_exc()
                 return
             else:
                 await send_text_to_room(self.client, room.room_id,
                                         grid,
-                                        markdown_convert=False)
+                                        markdown_convert=use_markdown)
                 return
 
         ## Memes
