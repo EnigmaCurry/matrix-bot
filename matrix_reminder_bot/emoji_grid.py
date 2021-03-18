@@ -5,13 +5,10 @@ import random
 import math
 import re
 import shlex
-
-circle_emoji = np.array(
-    [ord(emoji.emojize(f":{color}_circle:")) for color in [
-        "red","orange","yellow","green","blue",
-        "purple","brown","black","white"]])
+import operator
 
 warning_emoji = emoji.emojize(":warning:")
+
 variation_pattern = re.compile("^grid[a-zA-Z0-9]*$")
 EN_emoji = list(emoji.core.unicode_codes.EMOJI_UNICODE['en'].values())
 
@@ -140,6 +137,36 @@ def quad_mirror(in_grid, overlap=False):
         grid[0:in_grid.shape[0], in_grid.shape[1]:in_grid.shape[1]*2] = top_right
     return grid
 
+def spiral(height, width, sequence):
+    grid = np.zeros(shape=(height, width), dtype=int)
+    pos = (0, 0)
+    n = 0
+    num_turns = 0
+    directions = ((1,0), (0, 1), (-1, 0), (0, -1))
+    def test_pos(next_pos):
+        try:
+            val = grid[next_pos[0]][next_pos[1]]
+            if val == 0:
+                return True
+        except Exception as e:
+            return False
+    while True:
+        grid[pos[0]][pos[1]] = sequence[n % len(sequence)]
+        n += 1
+        next_pos = tuple(map(operator.add, pos, directions[num_turns % 4]))
+        if test_pos(next_pos):
+            pos = next_pos
+        else:
+            num_turns += 1
+            next_pos = tuple(map(operator.add, pos, directions[num_turns % 4]))
+            if test_pos(next_pos):
+                pos = next_pos
+                continue
+            else:
+                return grid
+        if n > (height*width):
+            raise RuntimeError("infinite loop?")
+
 def border(in_grid, sequence):
     grid = np.zeros(shape=(in_grid.shape[0]+len(sequence)*2,
                            in_grid.shape[1]+len(sequence)*2), dtype=int)
@@ -261,12 +288,12 @@ def grid2D(args, in_grid=None):
         elif cmd[0] == "small":
             pass #handled in emoji_grid
         elif cmd[0] == "random":
-            width = parse_int(cmd[1], None)
-            height = parse_int(cmd[2], None)
-            if width is None or height is None:
-                raise ValueError("Random requires width and height as integers")
+            height = parse_int(cmd[1], None)
+            width = parse_int(cmd[2], None)
+            if height is None or width is None:
+                raise ValueError("Random requires height and width as integers")
             chars = []
-            for i in range(width*height):
+            for i in range(height*width):
                 while True:
                     r = random.choice(EN_emoji)
                     ## Only accept single character emoji
@@ -275,7 +302,17 @@ def grid2D(args, in_grid=None):
                     else:
                         print(len(r))
                 chars.append(get_emoji_id(r))
-            grid = np.array(chars).reshape(width, height)
+            grid = np.array(chars).reshape(height, width)
+        elif cmd[0] == "spiral":
+            height = parse_int(cmd[1], None)
+            width = parse_int(cmd[2], None)
+            chars = [get_emoji_id(e['emoji']) for e in emoji.emoji_lis("".join(cmd[1:]))]
+            grid = spiral(height, width, chars)
+        elif cmd[0] == "marquee":
+            pad = parse_int(cmd[1], 1)
+            chars = [get_emoji_id(e['emoji']) for e in emoji.emoji_lis("".join(cmd[1:]))]
+            grid = spiral(in_grid.shape[0]+pad*2, in_grid.shape[1]+pad*2, chars)
+            grid[pad:-pad, pad:-pad] = in_grid
         else:
             raise ValueError("grid2d missing command")
     return grid
@@ -313,6 +350,7 @@ to be specified, and shows the default value that will be used in its place.
     a single emoji with a number multiplier.
 
     Examples: `pad 🎹🥇`, `pad 2🔵`
+
  * `roll [down] [multiple=1]` - shift each row of the grid in a cascading pattern.
 
     By default rows are shifted left or right. If `down` is specified, columns
@@ -344,16 +382,27 @@ to be specified, and shows the default value that will be used in its place.
 
  * `small` - Force the output of the emoji to be small (Element Desktop only)
 
- * `random WIDTH HEIGHT` - Ignore input entirely and create a new grid of
+ * `random HEIGHT WIDTH` - Ignore input entirely and create a new grid of
    completely random emoji - width and height should be integer numbers.
+
+ * `spiral HEIGHT WIDTH EMOJI EMOJI ...` - Create a new grid and spiral/snake a
+   sequence of emoji around the edge until it reaches the center.
+
+ * `marquee [N=1] EMOJI EMOJI ...` - like pad, but create border by snaking
+   around the edge, the same as spiral, filling with the sequence of emoji.
+
+    N is the width of the new border.
 
 ## Grid generators
 
 The following grid generators exist, which you may invoke as the _first_ grid command only.
 
+All grid generators take one parameter only: a list of emoji characters.
+
 {", ".join([func for func in globals() if variation_pattern.match(str(func))])}
 
-These can be followed by any of the pipeline command from above, for example:
+These can be used by themselves to draw a particular pattern, or can be
+processed by any of the pipeline (`|`) commands from above, for example:
 
 ```
 !gridW 🔵🔴💶🥇🎹 | cat 2 right | small
@@ -364,7 +413,10 @@ These can be followed by any of the pipeline command from above, for example:
 If you don't use one of the grid generators as the first command, you can
 instead provide the input grid yourself as a two dimensional array. Simply type
 the command as normal, and starting on the second line type the emoji grid to
-use as input. Example (this is a single message on three lines:)
+use as input. Example (this is expressed as a single message on three lines
+(grid starting on line 2 and continuing for as many lines as needed, just make
+sure its rectangular, with all lines the same width [in terms of unicode emoji
+characters, not bytes]):)
 
 ```
 !grid quad_mirror
@@ -379,6 +431,8 @@ use as input. Example (this is a single message on three lines:)
  * `!grid1 👟👠🪜`
  * `!grid2 👟👠🪜`
  * `!grid2 👟👠🪜 | quad_mirror`
+ * `!grid random 3 3 | quad_mirror | cat right 2`
+ * `!gridX 👟👠🪜🥗🧗 | cat 2 right | small`
 """
 
 
